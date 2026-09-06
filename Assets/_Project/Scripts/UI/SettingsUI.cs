@@ -1,0 +1,3 @@
+using UnityEngine;
+using UnityEngine.UI;
+namespace WebGLRescueArena { public sealed class SettingsUI : MonoBehaviour { [SerializeField] private Toggle musicToggle; [SerializeField] private Toggle sfxToggle; [SerializeField] private SaveService saveService; [SerializeField] private AudioManager audioManager; private void OnEnable() { musicToggle.isOn = saveService.MusicEnabled; sfxToggle.isOn = saveService.SfxEnabled; } public void SetMusic(bool enabled) { saveService.SetMusicEnabled(enabled); audioManager.SetMusic(enabled); } public void SetSfx(bool enabled) { saveService.SetSfxEnabled(enabled); audioManager.SetSfx(enabled); } } }

@@ -1,0 +1,2 @@
+using UnityEngine;
+namespace WebGLRescueArena { public sealed class CameraFollow : MonoBehaviour { [SerializeField] private Transform target; [SerializeField] private Vector3 offset = new Vector3(0f, 15f, -10f); [SerializeField] private float followSpeed = 8f; private void LateUpdate() { transform.position = Vector3.Lerp(transform.position, target.position + offset, followSpeed * Time.deltaTime); transform.rotation = Quaternion.Euler(55f, 0f, 0f); } } }

@@ -1,0 +1,2 @@
+using UnityEngine;
+namespace WebGLRescueArena { public sealed class MainMenuUI : MonoBehaviour { [SerializeField] private SceneLoader sceneLoader; [SerializeField] private GameObject settingsPanel; public void Play() => sceneLoader.LoadGame(); public void OpenSettings() => settingsPanel.SetActive(true); public void CloseSettings() => settingsPanel.SetActive(false); public void Quit() => Application.Quit(); } }

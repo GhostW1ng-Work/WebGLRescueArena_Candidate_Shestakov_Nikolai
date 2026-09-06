@@ -1,0 +1,2 @@
+using UnityEngine;
+namespace WebGLRescueArena { public sealed class AudioManager : MonoBehaviour { [SerializeField] private AudioSource musicSource; [SerializeField] private AudioSource sfxSource; public void SetMusic(bool enabled) { musicSource.mute = !enabled; } public void SetSfx(bool enabled) { sfxSource.mute = !enabled; } public void PlaySfx(AudioClip clip) { if (sfxSource.mute || clip == null) return; sfxSource.PlayOneShot(clip); } } }
