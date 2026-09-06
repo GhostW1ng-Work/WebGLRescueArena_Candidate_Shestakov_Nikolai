@@ -7,30 +7,77 @@ namespace WebGLRescueArena
     {
         [SerializeField] private float moveSpeed = 3f;
         [SerializeField] private LayerMask obstructionMask;
-        private Transform target;
+
+        private static Transform cachedPlayerTarget;
+
         private EnemyAttack attack;
         private EnemyManager manager;
-        private void Awake() => attack = GetComponent<EnemyAttack>();
-        private void Start()
+        private Transform myTransform;
+
+        private const float StoppingDistanceSqr = 1.21f;
+
+        private void Awake()
         {
-            manager = GetComponentInParent<EnemyManager>();
-            if (manager != null) manager.Register(this);
+            attack = GetComponent<EnemyAttack>();
+            myTransform = transform;
         }
-        private void OnDestroy()
+
+        private void OnEnable()
         {
-            if (manager != null) manager.Unregister(this);
+            if (cachedPlayerTarget == null)
+            {
+                GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+                if (playerObj != null)
+                {
+                    cachedPlayerTarget = playerObj.transform;
+                }
+            }
+
+            if (manager == null)
+            {
+                manager = GetComponentInParent<EnemyManager>();
+            }
+
+            if (manager != null)
+            {
+                manager.Register(this);
+            }
         }
-        private void Update()
+
+        private void OnDisable()
         {
-            if (target == null) target = GameObject.FindGameObjectWithTag("Player").transform;
-            Vector3 direction = target.position - transform.position;
+            if (manager != null)
+            {
+                manager.Unregister(this);
+            }
+        }
+
+        public void Tick()
+        {
+            if (cachedPlayerTarget == null) return;
+
+            Vector3 currentPos = myTransform.position;
+            Vector3 targetPos = cachedPlayerTarget.position;
+
+            Vector3 direction = targetPos - currentPos;
             direction.y = 0f;
-            float distance = Vector3.Distance(transform.position, target.position);
-            if (Physics.Raycast(transform.position + Vector3.up * 0.4f, direction.normalized, distance, obstructionMask)) return;
-            if (distance > 1.1f) transform.position += direction.normalized * (moveSpeed * Time.deltaTime);
-            transform.LookAt(new Vector3(target.position.x, transform.position.y, target.position.z));
-            attack.Tick(target);
+
+            float sqrDistance = direction.sqrMagnitude;
+
+            if (Physics.Raycast(currentPos + Vector3.up * 0.4f, direction, Mathf.Sqrt(sqrDistance), obstructionMask))
+            {
+                return;
+            }
+
+            if (sqrDistance > StoppingDistanceSqr)
+            {
+                myTransform.position += direction.normalized * (moveSpeed * Time.deltaTime);
+            }
+
+            targetPos.y = currentPos.y;
+            myTransform.LookAt(targetPos);
+
+            attack.Tick(cachedPlayerTarget);
         }
-        public void Tick() { }
     }
 }

@@ -2089,7 +2089,7 @@ MonoBehaviour:
   gameOverUI: {fileID: 962106659}
   enemySpawner: {fileID: 1925599135}
   playerHealth: {fileID: 729014388}
-  stressMode: 0
+  stressMode: 1
 --- !u!4 &903771059
 Transform:
   m_ObjectHideFlags: 0
