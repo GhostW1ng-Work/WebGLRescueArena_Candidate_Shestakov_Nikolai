@@ -77,7 +77,6 @@ namespace WebGLRescueArena
                 }
             }
 
-            // Прижимаем к полу с учетом смещения центра модели
             if (Physics.Raycast(currentPos + Vector3.up * GroundRayOffset, Vector3.down, out RaycastHit hit, GroundRayDistance, groundMask, QueryTriggerInteraction.Ignore))
             {
                 currentPos.y = hit.point.y + yOffset;
