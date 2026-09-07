@@ -1,69 +1,166 @@
-# Summary
+# WebGL Rescue Arena — Performance Optimization Report
 
-В ходе работы проведена комплексная оптимизация физической архитектуры, подсистемы памяти и геймплейного цикла WebGL-версии арена-шутера. Основной акцент был сделан на исключение оверхеда физического движка PhysX, устранение промежуточных аллокаций памяти (`0 B GC Alloc` на кадр) и достижение максимального FPS без изменений в геймплейной логике. Все решения подтверждены инструментальными измерениями в Unity Profiler и Chrome DevTools в реальном браузерном окружении (itch.io) на Release/LTO билде.
+## Summary
 
-# Environment
+В ходе работы проведена оптимизация физической архитектуры, памяти,
+геймплейного цикла и rendering pipeline WebGL-версии арена-шутера.
 
-Unity version: 2026 LTS (Unity 6 / 6000.5.3f1)
+Основной фокус был направлен на измеренные bottlenecks:
+CPU overhead от большого количества Dynamic Rigidbody,
+GC allocations в gameplay loop и большое количество Draw Calls.
 
-Browser: Google Chrome (WebGL 2.0 / itch.io Host)
+Изменения выполнялись без изменения основной gameplay logic.
+Проблемы и результаты проверялись с помощью Unity Profiler и
+Chrome DevTools в браузере на Release/LTO WebGL build.
 
-Hardware: Mid-Range Desktop PC (Windows 10) #ПОСМОТРИ
+## Environment
 
-# Baseline
+- Unity: Unity 6 / 6000.5.3f1
+- Browser: Google Chrome
+- Platform: WebGL 2.0
+- Host: itch.io
+- GPU: NVIDIA RTX 3050
+- CPU: Intel Core i5-11260H @ 2.6 GHz, 6 cores / 12 threads
+- RAM: 16 GB
+- OS: Windows 10
 
-FPS / Frame Time: ~60 FPS / ~16.6 ms (с регулярными микрофризами из-за PhysX и GC)
+## Baseline
 
-Memory: ~50 MB Total JS Heap (динамический рост Heap из-за `Instantiate`/`Destroy`)
+- Frame Time:и~16.6 ms
+- Total JS Heap: ~50 MB
+- GC Alloc: non-zero allocations during gameplay
+- Draw Calls / Batches: ~331
+- Active Dynamic Bodies: 50+
+- WebGL build: unoptimized baseline configuration
 
-GC Alloc: > 0 B на кадр (аллокации в `Update` и при физических проверках)
+## Bottlenecks Found
 
-Build Size: Unoptimized WebGL baseline
+### CPU / Gameplay
 
-Load Time: Standard
+- Каждый EnemyController выполнял собственный Update().
+- FindGameObjectWithTag("Player") вызывался из Update().
+- Использовались Vector3.Distance() и normalized в горячем пути.
+- EnemyManager использовал LINQ и сортировку списка.
+- UI обновлялся чаще, чем это было необходимо.
 
-# Issues Found
+### Memory / GC
 
-1. **PhysX Overhead:** Более 50 активных динамических тел (`Active Dynamic Bodies`) нагружали главный поток CPU просчетом гравитации, инерции и сложных коллизий объемов.
-2. **GC Alloc Spikes & Fragmentation:** Использование `Instantiate`/`Destroy` при спавне пуль/врагов и выделения памяти в `Update()` выдерживали постоянную нагрузку на сборщик мусора (V8 GC).
-3. Были выключены динамическая и статическая типизация, не был включен GPU Instancing из-за чего было слишком много Draw Calls.
-4. **Build Overhead:** Неоптимизированные параметры компиляции C++ и включенный перехват исключений снижали производительность итогового `.wasm` модуля.
+- Instantiate/Destroy использовались во время gameplay.
+- Создавались временные объекты и коллекции.
+- В корутинах создавались повторные WaitForSeconds.
 
-# Changes Made
+### Physics
 
-* **Kinematic Migration & Manager Pattern:** Все враги и снаряды переведены в кинематический режим (`Is Kinematic = true`). Нативная логика `Update()` у врагов заменена на единый централизованный `Tick()` из `EnemyManager` для устранения оверхеда вызовов C++/C# из движка.
-* **Zero-Alloc Object Pooling:** Использован предварительно инициализированный пул объектов для снарядов и врагов, исключивший операции выделения и освобождения памяти во время боя.
-* **Raycast Grounding:** Реализован алгоритм вертикального прижима к полному рельефу через `Physics.Raycast` с настройкой `yOffset` (компенсация высоты Pivot), явной маской `groundMask` и игнорированием триггеров (`QueryTriggerInteraction.Ignore`).
-* **GPU Instancing & Rendering Batching:** Включил галочку **Enable GPU Instancing** на материалах. Это позволило движку упаковывать однотипную геометрию орды в единые вызовы отрисовки и сократить число Draw Calls.
-* **Production Build Settings:** Настроена сборка в Unity 6:
-  * **Code Optimization:** `Runtime Speed with LTO` (Link-Time Optimization)
-  * **C++ Compiler Configuration:** `Release`
-  * **Compression:** `Brotli`
-  * **WebGL Template:** `Minimal`
+- Большое количество Dynamic Rigidbody увеличивало стоимость
+  physics simulation.
+- Enemy ↔ Enemy collisions не требовались gameplay-логике.
+- Projectile использовал более тяжёлую физическую конфигурацию,
+  чем требовалось для его поведения.
 
-# Measurements After Changes
+### Rendering
 
-FPS / Frame Time: 500+ FPS / ~1.5–2.0 ms
+- Dynamic Batching и Static Batching были отключены.
+- GPU Instancing не использовался.
+- В результате сцена имела около 331 draw call/batch.
 
-Scripting Execution Time (Chrome DevTools): 8 ms за 8.68 сек записи (~0.001 ms на кадр)
+## Changes Made
 
-Memory (Physics): 2.5 MB
+### Enemy Logic
 
-Total JS Heap (Chrome DevTools): 48.4 MB
+- EnemyController переведён с индивидуального Update() на
+  централизованный Tick() через EnemyManager.
+- Ссылка на Player кешируется.
+- Vector3.Distance()/normalized заменены на проверки через sqrMagnitude.
+- Удалён LINQ из горячих участков EnemyManager.
+- Сортировка переработана для исключения временных allocations.
 
-GC Alloc: 0 B на кадр (Подтверждено в Unity Profiler и чистым графиком `Allocation timelines` в Chrome DevTools)
+### Object Pooling
 
-Active Dynamic Bodies: 1 (Только Player)
+- Для врагов и снарядов внедрён Object Pooling.
+- Пул предварительно прогревается.
+- Instantiate/Destroy исключены из основного gameplay loop.
+- Состояние Projectile защищено от повторного release.
 
-Active Kinematic Bodies: 63+ (Все враги и пули)
+### Physics
 
-# Remaining Issues
+- Враги и снаряды переведены в Kinematic Rigidbody.
+- Projectile переведён на Discrete collision detection.
+- Настроена Layer Collision Matrix.
+- Отключены ненужные пары столкновений.
+- Для привязки врагов к рельефу реализован Raycast Grounding
+  с groundMask, yOffset и QueryTriggerInteraction.Ignore.
 
-* Static Colliders Sync: Оставлены базовые статические коллайдеры геометрии арены, так как при текущем числе объектов (<100) они не создают узких мест в производительности.
-* Visual Polish: Не вносились изменения в шейдеры и графические материалы, чтобы сфокусироваться на измеренных системных Bottlenecks (Physics & CPU).
-* Геймплейные баги
+### Rendering
 
-# What I Would Do Next
+- Включён GPU Instancing на подходящих материалах.
+- Включены Dynamic Batching и Static Batching в Project Settings.
+- Проверено отсутствие лишнего создания material instances.
 
-1. **Time-Sliced NavMesh:** При усложнении геометрии уровня (многоэтажность, мосты, динамические укрытия) заменить прямой `Raycast Grounding` на асинхронный NavMesh с распределением просчета путей по кадрам.
-2. Исправил бы геймплейные баги(например как игрок может выйти за арену или улететь в небеса)
+### WebGL Build
+
+- Runtime Speed with LTO
+- C++ Compiler Configuration: Release
+- Compression: Brotli
+- WebGL Template: Minimal
+
+## Results
+
+| Metric | Before | After |
+|---|---:|---:|
+| Frame Time | ~16.6 ms | ~1.5–2.0 ms |
+| Draw Calls / Batches | ~331 | 39 |
+| Instanced Objects | 0 | 291 |
+| Active Dynamic Bodies | 50+ | 1 |
+| Active Kinematic Bodies | 0 | 63+ |
+| Physics Frame Time | >1.5 ms | <0.3 ms |
+| Physics Memory | — | ~2.5 MB |
+| Total JS Heap | ~50 MB | 48.4 MB |
+
+### GC
+
+После оптимизации в измеренном gameplay path:
+
+- 0 B/frame GC Alloc;
+- единственная оставшаяся allocation — ~264 B при обновлении UI Timer
+  примерно раз в секунду;
+- аллокации от Enemy/Projectile spawning и основных gameplay systems
+  устранены.
+
+### Rendering
+
+Draw Calls / Batches:
+
+**331 → 39**
+
+Instanced Objects:
+
+**0 → 291**
+
+## Biggest Performance Improvements
+
+1. Перевод большого количества Dynamic Rigidbody в Kinematic.
+2. Object Pooling для врагов и снарядов.
+3. Централизация Enemy Update в EnemyManager.Tick().
+4. Настройка Layer Collision Matrix.
+5. Устранение LINQ и временных allocations.
+6. GPU Instancing + Dynamic/Static Batching.
+
+## Remaining Issues
+
+- **UI Timer allocation:** ~264 B при обновлении таймера. Оставлена,
+  поскольку происходит редко и не является performance bottleneck.
+- **Static Colliders:** Базовые коллайдеры арены оставлены без
+  дополнительной оптимизации, поскольку профилирование не показало
+  существенного влияния на frame time.
+- **Gameplay bugs:** Некоторые игровые edge cases сознательно не
+  исправлялись, поскольку не относились к performance bottlenecks.
+
+## What I Would Do Next
+
+1. Отдельно пересмотреть систему pathfinding при усложнении геометрии
+   уровня и распределять дорогие вычисления по кадрам.
+2. Исправить оставшиеся gameplay edge cases, например возможность игрока
+   покинуть арену или получить некорректное вертикальное перемещение.
+3. При необходимости провести дополнительный memory profiling на
+   длительной игровой сессии для проверки отсутствия долгосрочного
+   роста памяти.
