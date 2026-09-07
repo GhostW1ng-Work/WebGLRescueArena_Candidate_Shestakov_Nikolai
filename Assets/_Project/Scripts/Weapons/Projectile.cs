@@ -12,6 +12,7 @@ namespace WebGLRescueArena
         private Rigidbody body;
         private ObjectPool<Projectile> poolOwner;
         private int damage;
+        private float speed;
         private float deactivateTime;
         private bool isReleased;
 
@@ -25,10 +26,10 @@ namespace WebGLRescueArena
             poolOwner = pool;
         }
 
-        public void Launch(float speed, int damageValue)
+        public void Launch(float speedValue, int damageValue)
         {
+            speed = speedValue;
             damage = damageValue;
-            body.linearVelocity = transform.forward * speed;
             deactivateTime = Time.time + lifetime;
             isReleased = false;
         }
@@ -36,6 +37,8 @@ namespace WebGLRescueArena
         private void Update()
         {
             if (isReleased) return;
+
+            transform.Translate(Vector3.forward * (speed * Time.deltaTime));
 
             if (Time.time >= deactivateTime)
             {
