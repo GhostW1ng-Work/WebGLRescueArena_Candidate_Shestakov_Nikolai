@@ -7,7 +7,8 @@ namespace WebGLRescueArena
     {
         [SerializeField] private float moveSpeed = 3f;
         [SerializeField] private LayerMask obstructionMask;
-
+        [SerializeField] private LayerMask groundMask;
+        [SerializeField] private float yOffset = 1f;
         private static Transform cachedPlayerTarget;
 
         private EnemyAttack attack;
@@ -15,6 +16,8 @@ namespace WebGLRescueArena
         private Transform myTransform;
 
         private const float StoppingDistanceSqr = 1.21f;
+        private const float GroundRayDistance = 5f;
+        private const float GroundRayOffset = 2f;
 
         private void Awake()
         {
@@ -64,15 +67,23 @@ namespace WebGLRescueArena
 
             float sqrDistance = direction.sqrMagnitude;
 
-            if (Physics.Raycast(currentPos + Vector3.up * 0.4f, direction, Mathf.Sqrt(sqrDistance), obstructionMask))
-            {
-                return;
-            }
-
             if (sqrDistance > StoppingDistanceSqr)
             {
-                myTransform.position += direction.normalized * (moveSpeed * Time.deltaTime);
+                float distance = Mathf.Sqrt(sqrDistance);
+
+                if (!Physics.Raycast(currentPos + Vector3.up * 0.4f, direction / distance, distance, obstructionMask))
+                {
+                    currentPos += (direction / distance) * (moveSpeed * Time.deltaTime);
+                }
             }
+
+            // Прижимаем к полу с учетом смещения центра модели
+            if (Physics.Raycast(currentPos + Vector3.up * GroundRayOffset, Vector3.down, out RaycastHit hit, GroundRayDistance, groundMask, QueryTriggerInteraction.Ignore))
+            {
+                currentPos.y = hit.point.y + yOffset;
+            }
+
+            myTransform.position = currentPos;
 
             targetPos.y = currentPos.y;
             myTransform.LookAt(targetPos);

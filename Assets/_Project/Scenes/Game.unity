@@ -2089,6 +2089,8 @@ MonoBehaviour:
   gameOverUI: {fileID: 962106659}
   enemySpawner: {fileID: 1925599135}
   playerHealth: {fileID: 729014388}
+  saveService: {fileID: 0}
+  sceneLoader: {fileID: 0}
   stressMode: 1
 --- !u!4 &903771059
 Transform:
@@ -2636,7 +2638,7 @@ GameObject:
   - component: {fileID: 1263808821}
   - component: {fileID: 1263808820}
   - component: {fileID: 1263808819}
-  m_Layer: 8
+  m_Layer: 9
   m_Name: Floor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -3428,7 +3430,7 @@ Transform:
   m_GameObject: {fileID: 1492423930}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 1.85, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
