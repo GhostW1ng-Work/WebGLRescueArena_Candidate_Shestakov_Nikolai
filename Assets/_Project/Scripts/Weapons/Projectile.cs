@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Pool;
 
 namespace WebGLRescueArena
 {
@@ -6,18 +7,73 @@ namespace WebGLRescueArena
     public sealed class Projectile : MonoBehaviour
     {
         [SerializeField] private float lifetime = 2.5f;
-        [SerializeField] private GameObject fallbackImpactEffect;
+        [SerializeField] private GameObject impactEffectPrefab;
+
         private Rigidbody body;
+        private ObjectPool<Projectile> poolOwner;
         private int damage;
-        private void Awake() { body = GetComponent<Rigidbody>(); Destroy(gameObject, lifetime); }
-        public void Launch(float speed, int damageValue) { damage = damageValue; body.linearVelocity = transform.forward * speed; }
+        private float deactivateTime;
+        private bool isReleased;
+
+        private void Awake()
+        {
+            body = GetComponent<Rigidbody>();
+        }
+
+        public void InitializePool(ObjectPool<Projectile> pool)
+        {
+            poolOwner = pool;
+        }
+
+        public void Launch(float speed, int damageValue)
+        {
+            damage = damageValue;
+            body.linearVelocity = transform.forward * speed;
+            deactivateTime = Time.time + lifetime;
+            isReleased = false;
+        }
+
+        private void Update()
+        {
+            if (isReleased) return;
+
+            if (Time.time >= deactivateTime)
+            {
+                ReturnToPool();
+            }
+        }
+
         private void OnTriggerEnter(Collider other)
         {
-            EnemyHealth enemy = other.GetComponent<EnemyHealth>();
-            if (enemy != null) enemy.TakeDamage(damage);
-            GameObject impact = Resources.Load<GameObject>("Effects/Impact") ?? fallbackImpactEffect;
-            if (impact != null) Instantiate(impact, transform.position, Quaternion.identity);
-            Destroy(gameObject);
+            if (isReleased) return;
+
+            if (other.TryGetComponent<EnemyHealth>(out var enemy))
+            {
+                enemy.TakeDamage(damage);
+            }
+
+            if (impactEffectPrefab != null)
+            {
+                Instantiate(impactEffectPrefab, transform.position, Quaternion.identity);
+            }
+
+            ReturnToPool();
+        }
+
+        private void ReturnToPool()
+        {
+            if (isReleased) return;
+
+            isReleased = true;
+
+            if (poolOwner != null)
+            {
+                poolOwner.Release(this);
+            }
+            else
+            {
+                gameObject.SetActive(false);
+            }
         }
     }
 }

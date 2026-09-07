@@ -8,10 +8,9 @@ namespace WebGLRescueArena
         [SerializeField] private GameOverUI gameOverUI;
         [SerializeField] private EnemySpawner enemySpawner;
         [SerializeField] private PlayerHealth playerHealth;
+        [SerializeField] private SaveService saveService;
+        [SerializeField] private SceneLoader sceneLoader;
         [SerializeField] private bool stressMode;
-
-        private SaveService saveService;
-        private SceneLoader sceneLoader;
 
         private int score;
         private static int accumulatedScore;
@@ -23,8 +22,8 @@ namespace WebGLRescueArena
 
         private void Awake()
         {
-            saveService = FindObjectOfType<SaveService>();
-            sceneLoader = FindObjectOfType<SceneLoader>();
+            if (saveService == null) saveService = FindObjectOfType<SaveService>();
+            if (sceneLoader == null) sceneLoader = FindObjectOfType<SceneLoader>();
 
             if (stressMode) enemySpawner.EnableStressMode();
         }
@@ -51,6 +50,8 @@ namespace WebGLRescueArena
 
         private void Update()
         {
+            if (ended) return;
+
             elapsedTime += Time.deltaTime;
 
             if (elapsedTime - lastHudUpdate >= 0.1f)
@@ -86,16 +87,25 @@ namespace WebGLRescueArena
             if (ended) return;
             ended = true;
 
+            int bestScore = score;
             if (saveService != null)
             {
                 saveService.SaveBestScore(score);
-                gameOverUI.Show(score, saveService.BestScore);
+                bestScore = saveService.BestScore;
             }
 
+            gameOverUI.Show(score, bestScore);
             GameEvents.RaiseGameEnded();
         }
 
-        public void Restart() => sceneLoader?.RestartGame();
-        public void ReturnToMenu() => sceneLoader?.LoadMainMenu();
+        public void Restart()
+        {
+            if (sceneLoader != null) sceneLoader.RestartGame();
+        }
+
+        public void ReturnToMenu()
+        {
+            if (sceneLoader != null) sceneLoader.LoadMainMenu();
+        }
     }
 }
